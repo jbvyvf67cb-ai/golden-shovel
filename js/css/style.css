@@ -1,0 +1,594 @@
+/* ============================================================
+   MR. BANANAGRAMS 3 — STYLES
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0d1a13;
+  font-family: 'Georgia', 'Palatino', 'Book Antiqua', serif;
+  color: #f4ecd0;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#game-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at top, #1f3a25 0%, #0d1a13 75%);
+}
+
+#game-canvas {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+}
+#game-canvas canvas { display: block; }
+
+/* ----- HUD ----- */
+#hud {
+  position: fixed;
+  top: env(safe-area-inset-top, 8px);
+  left: env(safe-area-inset-left, 8px);
+  right: 56px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  font-size: 13px;
+  z-index: 10;
+  text-shadow: 1px 1px 0 #0d1a13, 2px 2px 4px rgba(0,0,0,0.8);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hud-block {
+  background: rgba(13, 26, 19, 0.85);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 2px solid #d4a437;
+  color: #f4ecd0;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  font-size: 12px;
+}
+.hud-hearts { color: #ff5577; letter-spacing: 2px; font-size: 16px; }
+#hud.hidden { display: none; }
+
+/* ----- Mute button ----- */
+#mute-btn {
+  position: fixed;
+  top: env(safe-area-inset-top, 8px);
+  right: 8px;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: rgba(20, 35, 25, 0.85);
+  border: 2px solid #d4a437;
+  color: #d4a437;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 200;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  user-select: none;
+}
+#mute-btn:hover { background: rgba(40, 60, 40, 0.95); }
+#mute-btn:active { transform: scale(0.92); }
+#mute-btn.muted { color: #888; border-color: #888; }
+
+/* ----- Touch controls ----- */
+#touch-controls {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 12px);
+  left: 0; right: 0;
+  display: none;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 50;
+  pointer-events: none;
+}
+body.touch #touch-controls { display: flex; }
+body.touch #touch-controls.hidden { display: none; }
+.tc-side {
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+}
+.tc-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: rgba(13, 26, 19, 0.7);
+  border: 3px solid #d4a437;
+  color: #f4ecd0;
+  font-size: 28px;
+  font-weight: bold;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.05s, background 0.05s;
+}
+.tc-btn.pressed { background: rgba(212, 164, 55, 0.4); transform: scale(0.92); }
+#tc-jump { background: rgba(50, 90, 50, 0.7); }
+#tc-throw { background: rgba(120, 80, 30, 0.7); }
+#tc-throw .shovel-icon {
+  font-size: 22px;
+  transform: rotate(-30deg);
+}
+
+/* ----- Overlays ----- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(13, 26, 19, 0.92);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  overflow-y: auto;
+}
+.overlay.hidden { display: none; }
+.overlay-card {
+  background:
+    linear-gradient(180deg, #1f3a25 0%, #15281b 100%);
+  border: 3px solid #d4a437;
+  border-radius: 14px;
+  padding: 28px 24px;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6), 0 0 0 1px rgba(212, 164, 55, 0.2) inset;
+  text-align: center;
+  position: relative;
+}
+.overlay-card.overlay-card-wide { max-width: 640px; }
+.overlay-card h1 {
+  font-size: 28px;
+  color: #f4ecd0;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 0 #0d1a13;
+}
+.overlay-card h2 {
+  font-size: 22px;
+  color: #f4ecd0;
+  margin-bottom: 8px;
+}
+.overlay-card .subtitle {
+  font-style: italic;
+  color: #d4a437;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+.overlay-card p {
+  color: #c9c0a0;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.overlay-card .stage-label {
+  display: inline-block;
+  background: #d4a437;
+  color: #0d1a13;
+  padding: 4px 14px;
+  border-radius: 14px;
+  font-weight: bold;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+}
+
+/* ----- Buttons ----- */
+.primary-btn, .secondary-btn {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 3px solid #d4a437;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  margin: 6px 4px;
+  transition: transform 0.05s;
+  -webkit-tap-highlight-color: transparent;
+}
+.primary-btn {
+  background: #d4a437;
+  color: #0d1a13;
+  box-shadow: 0 4px 0 #8a6620;
+}
+.primary-btn:hover { background: #e8b94a; }
+.primary-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #8a6620; }
+.primary-btn:disabled { background: #555; border-color: #555; color: #999; cursor: not-allowed; box-shadow: 0 4px 0 #333; }
+.secondary-btn {
+  background: transparent;
+  color: #d4a437;
+}
+.secondary-btn:hover { background: rgba(212, 164, 55, 0.15); }
+.secondary-btn:active { transform: translateY(2px); }
+.secondary-btn:disabled { color: #777; border-color: #777; cursor: not-allowed; opacity: 0.7; }
+
+/* ----- Toast ----- */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(13, 26, 19, 0.92);
+  border: 2px solid #d4a437;
+  color: #f4ecd0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: bold;
+  z-index: 90;
+  pointer-events: none;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ----- Source poem display ----- */
+.source-poem {
+  background: rgba(13, 26, 19, 0.5);
+  border: 1px solid #d4a437;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 10px 0;
+  font-style: italic;
+  color: #f4ecd0;
+  line-height: 1.7;
+  font-size: 15px;
+  text-align: center;
+}
+.source-poem .author {
+  display: block;
+  margin-top: 8px;
+  color: #d4a437;
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.source-poem .end-word {
+  background: rgba(212, 164, 55, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border-bottom: 2px solid #d4a437;
+  font-style: normal;
+  font-weight: bold;
+}
+.source-poem .target-word {
+  background: #d4a437;
+  color: #0d1a13;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-style: normal;
+  font-weight: bold;
+  box-shadow: 0 0 12px rgba(212, 164, 55, 0.6);
+}
+
+/* ----- Boss compose UI ----- */
+.compose-line-display {
+  background: rgba(13, 26, 19, 0.6);
+  border: 2px solid #d4a437;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 12px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 50px;
+  text-align: left;
+  color: #f4ecd0;
+}
+.compose-line-display .filled {
+  background: rgba(212, 164, 55, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 4px;
+  display: inline-block;
+}
+.compose-line-display .pending-end {
+  color: #d4a437;
+  font-weight: bold;
+  border-bottom: 2px dashed #d4a437;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+.compose-line-display .placeholder {
+  color: #6a7a6f;
+  font-style: italic;
+}
+
+/* ----- Compose timer ----- */
+.compose-timer {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(13, 26, 19, 0.7);
+  border: 2px solid #6a8a3a;
+  color: #c4d97a;
+  font-weight: bold;
+  font-size: 13px;
+  letter-spacing: 1px;
+  vertical-align: middle;
+}
+.compose-timer.idle {
+  border-color: #5a6a5a;
+  color: #8aa080;
+  opacity: 0.75;
+}
+.compose-timer.warning {
+  border-color: #d4a437;
+  color: #f5d870;
+  animation: pulseTimer 0.8s ease-in-out infinite;
+}
+.compose-timer.urgent {
+  border-color: #ff5577;
+  color: #ff8aaa;
+  animation: pulseTimer 0.4s ease-in-out infinite;
+}
+@keyframes pulseTimer {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+/* ----- Compose typed input row ----- */
+.compose-input-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  align-items: stretch;
+}
+#compose-typed-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(13, 26, 19, 0.7);
+  border: 2px solid #6a8a3a;
+  border-radius: 8px;
+  color: #f4ecd0;
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-user-select: text; user-select: text;
+}
+#compose-typed-input:focus { border-color: #d4a437; }
+#compose-typed-input::placeholder { color: #6a7a6f; font-style: italic; }
+.compose-add-btn {
+  margin: 0 !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  white-space: nowrap;
+}
+
+.wordbank-label {
+  font-size: 13px;
+  margin-bottom: 4px !important;
+  color: #d4a437 !important;
+  font-weight: bold;
+  text-align: left;
+}
+
+/* ----- Word bank grid ----- */
+.wordbank-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(13, 26, 19, 0.5);
+  border: 1px solid #5a4a2a;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.word-chip {
+  display: inline-block;
+  padding: 5px 11px;
+  background: #2a3a2a;
+  border: 2px solid #d4a437;
+  border-radius: 14px;
+  color: #f4ecd0;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.05s, background 0.05s;
+}
+.word-chip:hover { background: #3a4a3a; }
+.word-chip:active { transform: scale(0.95); }
+.word-chip.used { opacity: 0.4; cursor: default; text-decoration: line-through; }
+.word-chip.used:hover { background: #2a3a2a; }
+.wordbank-empty {
+  color: #c9c0a0;
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px;
+  margin: 0;
+}
+
+/* ============================================================
+   FULL POEM DISPLAY — golden-shovel layout
+   End words are RIGHT-ALIGNED with a dotted leader connecting
+   the line text to the buried Yeats word.
+   ============================================================ */
+.full-poem-display {
+  background: rgba(13, 26, 19, 0.6);
+  border: 2px solid #d4a437;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.full-poem-display .pl-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: #f4ecd0;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.full-poem-display .pl-num {
+  color: #d4a437;
+  font-weight: bold;
+  font-size: 11px;
+  min-width: 22px;
+  flex-shrink: 0;
+}
+/* The "before" portion sits on the left and grows; */
+/* the dot leader fills the gap; */
+/* the end word is pinned to the right, like the buried Yeats word. */
+.full-poem-display .pl-text {
+  flex: 1;
+  min-width: 0;
+  color: #f4ecd0;
+  word-wrap: break-word;
+}
+.full-poem-display .pl-leader {
+  flex: 1 1 24px;
+  min-width: 24px;
+  border-bottom: 1px dotted rgba(212, 164, 55, 0.35);
+  height: 1.1em;
+  align-self: end;
+  margin: 0 4px;
+}
+.full-poem-display .pl-end {
+  color: #d4a437;
+  font-weight: bold;
+  flex-shrink: 0;
+  border-bottom: 1px solid #d4a437;
+  padding: 0 2px;
+  letter-spacing: 0.5px;
+}
+.full-poem-display .pl-row.current {
+  background: rgba(212, 164, 55, 0.15);
+}
+.full-poem-display .pl-row.current .pl-num::after { content: ' ◀'; }
+.full-poem-display .pl-empty { color: #6a7a6f; font-style: italic; }
+
+/* ----- Compose action buttons row ----- */
+.compose-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.word-counter {
+  color: #d4a437;
+  font-size: 12px;
+  font-weight: bold;
+  margin: 4px 0 8px;
+}
+
+/* ----- Final poem styling ----- */
+.final-poem {
+  background: linear-gradient(180deg, rgba(212,164,55,0.1) 0%, rgba(13,26,19,0.6) 100%);
+  border: 3px solid #d4a437;
+  border-radius: 12px;
+  padding: 22px;
+  margin: 16px 0;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #f4ecd0;
+  box-shadow: 0 0 24px rgba(212, 164, 55, 0.25) inset;
+}
+.final-poem .fp-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.final-poem .fp-line-text { color: #f4ecd0; }
+.final-poem .fp-line-leader {
+  flex: 1 1 12px;
+  border-bottom: 1px dotted rgba(212, 164, 55, 0.3);
+  height: 1.1em;
+  align-self: end;
+}
+.final-poem .fp-line .endword {
+  color: #d4a437;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.final-poem .fp-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #d4a437;
+  margin-bottom: 14px;
+  font-variant: small-caps;
+  letter-spacing: 2px;
+}
+.final-poem .fp-byline {
+  text-align: right;
+  font-style: italic;
+  color: #c9c0a0;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+/* ----- Boss banner ----- */
+#boss-banner {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(13, 26, 19, 0.92);
+  border: 3px solid #d4a437;
+  border-radius: 12px;
+  padding: 20px 30px;
+  color: #f4ecd0;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: center;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+  box-shadow: 0 0 40px rgba(212, 164, 55, 0.4);
+}
+#boss-banner.show { opacity: 1; }
+#boss-banner .bb-sub {
+  display: block;
+  font-size: 13px;
+  color: #d4a437;
+  margin-top: 4px;
+  letter-spacing: 2px;
+  font-weight: normal;
+}
+
+/* ----- Helper / responsive ----- */
+.sr-only { position: absolute; left: -9999px; }
+@media (max-height: 500px) {
+  .overlay-card { padding: 16px; }
+  .overlay-card h1 { font-size: 22px; }
+}
+@media (max-width: 480px) {
+  .compose-input-row { flex-direction: column; }
+  .compose-add-btn { width: 100%; }
+  .full-poem-display { font-size: 13px; padding: 10px 12px; }
+}
