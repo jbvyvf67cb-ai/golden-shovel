@@ -316,6 +316,40 @@ body.touch #touch-controls.hidden { display: none; }
   font-style: italic;
 }
 
+/* ----- Compose timer ----- */
+.compose-timer {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(13, 26, 19, 0.7);
+  border: 2px solid #6a8a3a;
+  color: #c4d97a;
+  font-weight: bold;
+  font-size: 13px;
+  letter-spacing: 1px;
+  vertical-align: middle;
+}
+.compose-timer.idle {
+  border-color: #5a6a5a;
+  color: #8aa080;
+  opacity: 0.75;
+}
+.compose-timer.warning {
+  border-color: #d4a437;
+  color: #f5d870;
+  animation: pulseTimer 0.8s ease-in-out infinite;
+}
+.compose-timer.urgent {
+  border-color: #ff5577;
+  color: #ff8aaa;
+  animation: pulseTimer 0.4s ease-in-out infinite;
+}
+@keyframes pulseTimer {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
 /* ----- Compose typed input row ----- */
 .compose-input-row {
   display: flex;
