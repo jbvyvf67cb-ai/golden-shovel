@@ -76,7 +76,7 @@ class PlayScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.oneWayGroup, null, this.oneWayCheck, this);
     this.physics.add.collider(this.player, this.crumbles, this.onCrumbleStep, null, this);
     this.physics.add.collider(this.player, this.movers);
-    this.physics.add.overlap(this.player, this.spikes, this.onPlayerHazard, null, this);
+    this.physics.add.overlap(this.player, this.spikes, this.onPlayerSpike, null, this);
     this.physics.add.overlap(this.player, this.saws,   this.onPlayerHazard, null, this);
     this.physics.add.overlap(this.player, this.wblocks, this.onPlayerWBlock, null, this);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemy, null, this);
@@ -315,6 +315,19 @@ class PlayScene extends Phaser.Scene {
     this.damagePlayer(1);
     const dx = player.x - hazard.x;
     player.setVelocity(dx >= 0 ? 200 : -200, -300);
+  }
+
+  // Spikes in pits are lethal — falling on them is an instant kill, and the
+  // player would otherwise get wedged under the world geometry.
+  onPlayerSpike(player, _spike) {
+    if (this.bossDefeated) return;
+    if (GAME.hp <= 0) return;
+    GAME.hp = 0;
+    this.updateHud();
+    Audio.damage();
+    this.cameras.main.shake(280, 0.014);
+    this.player.setTint(0xff5577);
+    this.gameOver();
   }
 
   onPlayerEnemy(player, enemy) {
@@ -613,7 +626,6 @@ class PlayScene extends Phaser.Scene {
     if (!this.boss) return;
     this.bossDefeated = true;
     Audio.bossDown();
-    this.cameras.main.shake(360, 0.014);
 
     // append the level's end word to the line
     const line = [...GAME.currentLineWords, this.level.endWord];
@@ -621,18 +633,112 @@ class PlayScene extends Phaser.Scene {
     GAME.currentLineWords = [];
 
     const bx = this.boss.x, by = this.boss.y;
+    const boss = this.boss;
 
-    this.tweens.add({
-      targets: this.boss,
-      alpha: 0,
-      y: this.boss.y + 30,
-      duration: 800,
-      onComplete: () => Boss.despawn(this)
+    // ----- explosion sequence -----
+    // 1. Multiple staggered camera shakes (escalating)
+    this.cameras.main.shake(220, 0.008);
+    this.time.delayedCall(220, () => this.cameras.main.shake(280, 0.012));
+    this.time.delayedCall(520, () => this.cameras.main.shake(420, 0.018));
+
+    // 2. Staggered burst sounds
+    Audio.bossHit();
+    this.time.delayedCall(180, () => Audio.bossHit());
+    this.time.delayedCall(380, () => Audio.bossHit());
+    this.time.delayedCall(620, () => Audio.bossDown());
+
+    // 3. Boss flashes white-red while shaking, then puffs out
+    boss.shieldGfx.clear();
+    boss.shieldUp = false;
+    const shakeBoss = this.tweens.add({
+      targets: boss,
+      x: { from: bx - 4, to: bx + 4 },
+      duration: 60, yoyo: true, repeat: 14,
+      ease: 'Sine.easeInOut',
+    });
+    // tint cycle
+    let tintFlip = false;
+    const tintTimer = this.time.addEvent({
+      delay: 80,
+      repeat: 9,
+      callback: () => {
+        if (!boss.active) return;
+        boss.setTint(tintFlip ? 0xffffff : 0xff5577);
+        tintFlip = !tintFlip;
+      }
     });
 
-    this.dustParticles.emitParticleAt(bx, by - 40, 30);
+    // 4. Particle bursts in stages — use the existing dust emitter
+    //    plus extra puff sprites for color variation.
+    const colorPuff = (x, y, count, color) => {
+      for (let i = 0; i < count; i++) {
+        const p = this.add.image(x + (Math.random() - 0.5) * 20,
+                                  y + (Math.random() - 0.5) * 20, 'dot');
+        p.setTint(color);
+        p.setScale(2 + Math.random() * 3);
+        p.setDepth(20);
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 80 + Math.random() * 180;
+        this.tweens.add({
+          targets: p,
+          x: p.x + Math.cos(angle) * speed,
+          y: p.y + Math.sin(angle) * speed - 20,
+          alpha: 0,
+          scale: 0,
+          duration: 500 + Math.random() * 400,
+          ease: 'Quad.easeOut',
+          onComplete: () => p.destroy(),
+        });
+      }
+    };
+    // initial puffs
+    colorPuff(bx - 20, by - 30, 8, 0xfff8c4);
+    colorPuff(bx + 20, by - 50, 8, 0xfff8c4);
+    this.time.delayedCall(220, () => colorPuff(bx, by - 60, 14, 0xff5577));
+    this.time.delayedCall(420, () => colorPuff(bx - 30, by - 40, 14, 0xffaa3a));
+    this.time.delayedCall(620, () => {
+      // the BIG burst on final beat
+      colorPuff(bx, by - 50, 30, 0xfff8c4);
+      colorPuff(bx, by - 50, 18, 0xff5577);
+      colorPuff(bx, by - 50, 18, 0xffaa3a);
+      this.dustParticles.emitParticleAt(bx, by - 40, 30);
+    });
 
-    this.time.delayedCall(1100, () => {
+    // 5. Big white flash overlay on the camera
+    const flash = this.add.rectangle(0, 0, GAME_W, GAME_H, 0xffffff, 0)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(50);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0.9,
+      duration: 100,
+      delay: 580,
+      yoyo: true,
+      hold: 80,
+      onComplete: () => flash.destroy(),
+    });
+
+    // 6. Boss spirals away after the final flash
+    this.time.delayedCall(700, () => {
+      if (boss.active) {
+        this.tweens.add({
+          targets: boss,
+          alpha: 0,
+          scale: 0.2,
+          angle: 540,
+          y: by - 80,
+          duration: 600,
+          ease: 'Quad.easeIn',
+          onComplete: () => Boss.despawn(this)
+        });
+      }
+    });
+
+    // 7. After full sequence, show level complete
+    this.time.delayedCall(1700, () => {
+      if (tintTimer && tintTimer.remove) tintTimer.remove();
+      if (shakeBoss && shakeBoss.remove) shakeBoss.remove();
       this.scene.pause();
       this.physics.pause();
       document.getElementById('hud').classList.add('hidden');
@@ -645,7 +751,13 @@ class PlayScene extends Phaser.Scene {
           showFinalPoem();
         } else {
           GAME.levelIdx++;
-          this.scene.restart();
+          // resume + stop + start ensures a clean teardown of the paused scene.
+          // Going through Boot is overkill (re-generates textures); instead we
+          // explicitly stop and start Play so its init() re-reads GAME.levelIdx.
+          this.physics.resume();
+          this.scene.resume();
+          this.scene.stop();
+          this.scene.start('Play');
         }
       });
     });

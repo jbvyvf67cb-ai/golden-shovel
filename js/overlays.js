@@ -7,6 +7,64 @@
 // (between hits). Player must add at least 1 before continuing/done.
 let composeAddedThisVisit = 0;
 
+// Timer state for the 60-second compose window. The timer is LAZY —
+// it doesn't start when the overlay opens; it starts on the player's
+// first interaction (first keystroke in the typed input OR first chip
+// click). Cleared on Continue / Done / auto-timeout.
+let composeTimerInterval = null;
+let composeSecondsLeft = 60;
+let composeTimerStarted = false;
+let composeOnTimeout = null;
+const COMPOSE_DURATION_SECONDS = 60;
+
+function clearComposeTimer() {
+  if (composeTimerInterval) {
+    clearInterval(composeTimerInterval);
+    composeTimerInterval = null;
+  }
+  composeTimerStarted = false;
+  composeOnTimeout = null;
+}
+
+function armComposeTimer(onTimeout) {
+  // Stash the timeout callback but don't start counting yet.
+  clearComposeTimer();
+  composeSecondsLeft = COMPOSE_DURATION_SECONDS;
+  composeOnTimeout = onTimeout;
+  // Reset the visible display to show the full duration as a "ready" state.
+  updateComposeTimerDisplay(true);
+}
+
+function ensureComposeTimerRunning() {
+  if (composeTimerStarted || !composeOnTimeout) return;
+  composeTimerStarted = true;
+  composeSecondsLeft = COMPOSE_DURATION_SECONDS;
+  updateComposeTimerDisplay();
+  composeTimerInterval = setInterval(() => {
+    composeSecondsLeft--;
+    updateComposeTimerDisplay();
+    if (composeSecondsLeft <= 0) {
+      const cb = composeOnTimeout;
+      clearComposeTimer();
+      if (cb) cb();
+    }
+  }, 1000);
+}
+
+function updateComposeTimerDisplay(idle = false) {
+  const el = document.getElementById('compose-timer');
+  const secEl = document.getElementById('compose-timer-seconds');
+  if (!el || !secEl) return;
+  secEl.textContent = composeSecondsLeft;
+  el.classList.remove('warning', 'urgent', 'idle');
+  if (idle) {
+    el.classList.add('idle');
+    return;
+  }
+  if (composeSecondsLeft <= 10) el.classList.add('urgent');
+  else if (composeSecondsLeft <= 20) el.classList.add('warning');
+}
+
 function showOverlay(id) {
   document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
@@ -101,10 +159,23 @@ function showCompose(idx, onContinueFight, onDone) {
   refreshCompose(idx, onContinueFight, onDone);
   showOverlay('overlay-compose');
 
+  // 60-second compose window — armed but not yet ticking. Starts the moment
+  // the player begins typing or clicks a chip. On timeout, auto-return to
+  // the boss fight, keeping any words already added (they live in
+  // GAME.currentLineWords). The timeout bypasses the "must-add-a-word" gate.
+  armComposeTimer(() => {
+    Audio.click();
+    onContinueFight();
+  });
+
   // bind once-per-show: typed add
   const addTypedBtn = document.getElementById('btn-compose-add-typed');
   addTypedBtn.onclick = () => {
     handleTypedAdd(idx, onContinueFight, onDone);
+  };
+  // any keystroke that produces a character starts the timer
+  typedInput.oninput = () => {
+    if (typedInput.value.length > 0) ensureComposeTimerRunning();
   };
   typedInput.onkeydown = (e) => {
     if (e.key === 'Enter') {
@@ -124,6 +195,7 @@ function handleTypedAdd(idx, onContinueFight, onDone) {
     typedInput.value = '';
     return;
   }
+  ensureComposeTimerRunning();
   Audio.collectWord();
   GAME.currentLineWords.push(cleaned);
   composeAddedThisVisit++;
@@ -157,6 +229,7 @@ function refreshCompose(idx, onContinueFight, onDone) {
         chip.classList.add('used');
       } else {
         chip.onclick = () => {
+          ensureComposeTimerRunning();
           Audio.collectWord();
           GAME.currentLineWords.push(w);
           composeAddedThisVisit++;
@@ -189,6 +262,7 @@ function refreshCompose(idx, onContinueFight, onDone) {
   btnContinue.onclick = () => {
     if (!addedSomething) return;
     Audio.click();
+    clearComposeTimer();
     onContinueFight();
   };
 
@@ -203,6 +277,7 @@ function refreshCompose(idx, onContinueFight, onDone) {
   btnDone.onclick = () => {
     if (btnDone.disabled) return;
     Audio.click();
+    clearComposeTimer();
     onDone();
   };
 }
@@ -225,6 +300,45 @@ function showLevelComplete(idx, onContinue) {
     Audio.click();
     onContinue();
   };
+
+  // Copy-poem-so-far button: copies whatever lines have been completed
+  // up to this point. Available after every boss, not just the final one.
+  const copyBtn = document.getElementById('btn-level-copy');
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      Audio.click();
+      copyCurrentPoem();
+    };
+  }
+}
+
+// Build plain-text poem from completed lines and copy to clipboard.
+// Used by the level-complete overlay AND the final-poem overlay.
+function copyCurrentPoem() {
+  let txt = 'The Golden Shovel of Nature\n\n';
+  let lineCount = 0;
+  for (let i = 0; i < LEVELS.length; i++) {
+    const line = GAME.poemLines[i];
+    if (!line) continue;
+    txt += line.join(' ') + '\n';
+    lineCount++;
+  }
+  if (lineCount === 0) {
+    showToast('Nothing to copy yet.');
+    return;
+  }
+  // attribution always added
+  txt += `\n— after Yeats, "${YEATS_FULL_LINE}"`;
+  const successMsg = lineCount === LEVELS.length
+    ? '📋 Poem copied!'
+    : `📋 Copied ${lineCount} of ${LEVELS.length} lines!`;
+  try {
+    navigator.clipboard.writeText(txt).then(() => {
+      showToast(successMsg);
+    }).catch(() => fallbackCopy(txt, successMsg));
+  } catch (e) {
+    fallbackCopy(txt, successMsg);
+  }
 }
 
 function escapeHTML(s) {
@@ -253,21 +367,8 @@ function showFinalPoem() {
   document.body.classList.remove('hud-visible');
 
   document.getElementById('btn-final-copy').onclick = () => {
-    let txt = 'The Golden Shovel of Nature\n\n';
-    for (let i = 0; i < LEVELS.length; i++) {
-      const line = GAME.poemLines[i];
-      if (!line) continue;
-      txt += line.join(' ') + '\n';
-    }
-    txt += `\n— after Yeats, "${YEATS_FULL_LINE}"`;
-    try {
-      navigator.clipboard.writeText(txt).then(() => {
-        showToast('📋 Poem copied!');
-      }).catch(() => fallbackCopy(txt));
-    } catch (e) {
-      fallbackCopy(txt);
-    }
     Audio.click();
+    copyCurrentPoem();
   };
 
   document.getElementById('btn-final-restart').onclick = () => {
@@ -278,14 +379,14 @@ function showFinalPoem() {
   };
 }
 
-function fallbackCopy(txt) {
+function fallbackCopy(txt, successMsg) {
   const ta = document.createElement('textarea');
   ta.value = txt;
   ta.style.position = 'fixed';
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); showToast('📋 Poem copied!'); }
+  try { document.execCommand('copy'); showToast(successMsg || '📋 Poem copied!'); }
   catch (e) { showToast('Copy failed — select manually.'); }
   document.body.removeChild(ta);
 }

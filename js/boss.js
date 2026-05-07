@@ -59,6 +59,10 @@ const Boss = {
     b.body.allowGravity = false;
     b.body.setSize(72, 80).setOffset(12, 12);
     b.setDepth(5);
+    b.setAlpha(1);
+    b.setScale(1);
+    b.setAngle(0);
+    b.clearTint();
 
     b.center = { x: bx, y: by };
     b.dir = -1;
@@ -305,14 +309,22 @@ const Boss = {
   resumeAfterCompose(s) {
     const b = s.boss;
     if (!b) return;
+    // belt-and-braces: make sure no tween or stale state has left the boss
+    // partly transparent / scaled / rotated / killed. The ONLY path that
+    // should change these is defeatBoss, but if anything else does, this
+    // resyncs.
+    b.setAlpha(1);
+    b.setScale(1);
+    b.setAngle(0);
+    b.setVisible(true);
+    if (!b.active) b.setActive(true);
+    b.clearTint();
     b.shieldUp = true;
-    // shorter shield duration the more cycles in
     b.shieldFrames = Math.max(BOSS_CFG.shieldUpFramesMin,
                               BOSS_CFG.shieldUpFrames - b.cycleCount * 18);
     b.invulnFrames = BOSS_CFG.invulnAfterCompose;
     b.throwTimer = 30 + Math.random() * 60; // throws sooner
     b.throwTelegraph = 0;
-    b.clearTint();
     // give boss slightly more range each cycle (more dynamic)
     // — capped well below arena edges so it never "leaves" the screen.
     b.range = Math.min(b.range + 12, 180);

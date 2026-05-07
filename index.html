@@ -54,13 +54,14 @@
       <span class="author">— W. B. Yeats, <i>He Wishes For The Cloths Of Heaven</i></span>
     </div>
     <p style="font-size:13px; color: #d4a437;">9 levels · 9 lines · one buried Yeats line</p>
+    <p style="font-size:10px; color: #6a8a6a; margin-top:-8px; opacity:0.7;">build 2026.05.07-d</p>
     <button class="primary-btn" id="btn-title-start">START THE GAME</button>
     <details style="margin-top: 12px; font-size: 12px; color: #c9c0a0;">
       <summary style="cursor: pointer; color: #d4a437;">How to play</summary>
       <p style="margin-top:8px; text-align:left;">
         Run, jump, and dig your way through nine nature levels. Defeat enemies and break <b style="color:#d4a437;">word blocks</b> (jump up into them OR throw your golden shovel) to fill your <b>nature word bank</b>.
-        At each level's end, a boss waits behind a shield. Wait for the shield to drop, dodge its thrown seeds, and land hits — every hit lets you add one word to your line. The line must end with the level's assigned word.
-        Five words minimum. Add more if you like, then choose <b>done</b> to defeat the boss.
+        At each level's end, a boss waits behind a shield. Wait for the shield to drop, dodge its thrown seeds, and land a hit — that opens the compose window.
+        You'll have <b>60 seconds</b> (starting on your first word) to type freely, tap word-bank chips, or both. The line must end with the level's assigned word. <b>5 words minimum</b>, then click DONE to defeat the boss.
       </p>
     </details>
   </div>
@@ -83,8 +84,9 @@
 <div class="overlay hidden" id="overlay-compose">
   <div class="overlay-card overlay-card-wide">
     <div class="stage-label" id="compose-label">ADD A WORD</div>
+    <div class="compose-timer" id="compose-timer">⏱ <span id="compose-timer-seconds">60</span>s</div>
     <h2 id="compose-heading">Pick a word to add</h2>
-    <p style="font-size: 13px; color: #c9c0a0;">Each hit on the boss lets you add one word. The line must end with <b id="compose-endword" style="color:#d4a437">word</b>. <span style="color:#d4a437;font-weight:bold;">Add a word before continuing.</span></p>
+    <p style="font-size: 13px; color: #c9c0a0;">You have <b style="color:#c4d97a;">60 seconds</b> (starting on your first word) to write a line ending with <b id="compose-endword" style="color:#d4a437">word</b>. <b style="color:#d4a437;">Type any word</b> in the box, or tap chips from your bank. <b>5 words minimum</b> to defeat the boss.</p>
 
     <!-- Full poem so far -->
     <div class="full-poem-display" id="full-poem-display"></div>
@@ -117,7 +119,10 @@
     <div class="compose-line-display" id="level-complete-line"></div>
     <p>The buried word was <b id="level-complete-endword" style="color:#d4a437; font-size: 16px;">word</b>. Yeats's poem grows.</p>
     <div class="full-poem-display" id="level-complete-fullpoem"></div>
-    <button class="primary-btn" id="btn-level-continue">NEXT LEVEL</button>
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+      <button class="secondary-btn" id="btn-level-copy">📋 Copy Poem So Far</button>
+      <button class="primary-btn" id="btn-level-continue">NEXT LEVEL</button>
+    </div>
   </div>
 </div>
 
