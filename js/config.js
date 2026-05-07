@@ -14,9 +14,9 @@ const PHYS = {
   DOUBLE_JUMP_POWER: 460,
   FRICTION_AIR: 0.92,
   FRICTION_GROUND: 0.78,
-  THROW_VEL_X: 520,
-  THROW_VEL_Y: -240,
-  THROW_GRAVITY: 700,
+  THROW_VEL_X: 540,
+  THROW_VEL_Y: -130,
+  THROW_GRAVITY: 750,
 };
 
 // ----- YEATS LINE — the spine of the golden shovel -----

@@ -436,6 +436,7 @@ class PlayScene extends Phaser.Scene {
     this.updateEnemies();
     ObstaclesUpdate.crumbles(this);
     ObstaclesUpdate.movers(this);
+    ObstaclesUpdate.carryPlayerOnMovers(this, this.player);
     ObstaclesUpdate.saws(this);
     ObstaclesUpdate.vines(this, this.player);
 

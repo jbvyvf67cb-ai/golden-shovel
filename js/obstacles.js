@@ -178,6 +178,32 @@ const ObstaclesUpdate = {
     });
   },
 
+  // Carry the player along when they're standing on top of a moving platform.
+  // Phaser arcade physics doesn't do this automatically, so each frame we add
+  // the platform's per-frame velocity to the player's position when their feet
+  // are on top of it. Call AFTER `movers(s)` (so the velocity is up to date).
+  carryPlayerOnMovers(s, player) {
+    if (!player || !player.body) return;
+    const onGround = player.body.blocked.down || player.body.touching.down;
+    if (!onGround) return;
+    const dt = 1 / 60;
+    const playerBottom = player.body.y + player.body.height;
+    s.movers.children.iterate(m => {
+      if (!m || !m.active || !m.body) return;
+      const platTop = m.body.y;
+      // close-enough vertical alignment: player's feet near platform top
+      if (Math.abs(playerBottom - platTop) > 6) return;
+      // horizontal overlap
+      const halfW = m.body.width / 2;
+      if (Math.abs(player.x - m.x) > halfW + player.body.width / 2) return;
+      // displace player by this frame's platform motion
+      const dx = m.body.velocity.x * dt;
+      const dy = m.body.velocity.y * dt;
+      if (dx) player.x += dx;
+      if (dy) player.y += dy;
+    });
+  },
+
   saws(s) {
     s.saws.children.iterate(sw => {
       if (!sw || !sw.active) return;

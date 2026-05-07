@@ -115,12 +115,13 @@ const Boss = {
       targetX += b.dashVel * (1/60);
       b.dashVel *= 0.93;
       if (Math.abs(b.dashVel) < 8) b.dashVel = 0;
-      // clamp inside arena
-      const arenaMin = s.bossSpawnX - 200;
-      const arenaMax = s.levelWidth - 60;
-      if (targetX < arenaMin) targetX = arenaMin;
-      if (targetX > arenaMax) targetX = arenaMax;
     }
+    // ALWAYS clamp inside the arena so a large `range` value can't swing the
+    // boss past the world bounds and make it visually disappear.
+    const arenaMin = s.bossSpawnX - 100;
+    const arenaMax = s.levelWidth - 80;
+    if (targetX < arenaMin) targetX = arenaMin;
+    if (targetX > arenaMax) targetX = arenaMax;
     b.x = targetX;
     // face the player
     b.setFlipX(s.player.x > b.x);
@@ -313,7 +314,8 @@ const Boss = {
     b.throwTelegraph = 0;
     b.clearTint();
     // give boss slightly more range each cycle (more dynamic)
-    b.range = Math.min(b.range + 14, 240);
+    // — capped well below arena edges so it never "leaves" the screen.
+    b.range = Math.min(b.range + 12, 180);
   },
 
   // hard despawn on defeat
