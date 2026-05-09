@@ -3,14 +3,14 @@
 // ============================================================
 'use strict';
 
-// Tracks how many words were added in the current compose visit
-// (between hits). Player must add at least 1 before continuing/done.
-let composeAddedThisVisit = 0;
+// Tracks the currently-typed line text. Refreshed every keystroke.
+// On Done or timeout, we tokenize this on whitespace and store as
+// GAME.currentLineWords.
+let composeTypedText = '';
 
 // Timer state for the 60-second compose window. The timer is LAZY —
 // it doesn't start when the overlay opens; it starts on the player's
-// first interaction (first keystroke in the typed input OR first chip
-// click). Cleared on Continue / Done / auto-timeout.
+// first keystroke OR first chip click. Cleared on Done or auto-timeout.
 let composeTimerInterval = null;
 let composeSecondsLeft = 60;
 let composeTimerStarted = false;
@@ -63,6 +63,14 @@ function updateComposeTimerDisplay(idle = false) {
   }
   if (composeSecondsLeft <= 10) el.classList.add('urgent');
   else if (composeSecondsLeft <= 20) el.classList.add('warning');
+}
+
+// Tokenize typed text into words on whitespace (including newlines).
+// Filters out empty strings. Used for both word counting and saving
+// to GAME.currentLineWords at end-of-compose.
+function tokenizeTypedText(text) {
+  if (!text) return [];
+  return text.split(/\s+/).map(s => s.trim()).filter(s => s.length > 0);
 }
 
 function showOverlay(id) {
@@ -142,141 +150,117 @@ function showLevelIntro(idx, onContinue) {
 }
 
 // =================== COMPOSE ===================
-// Called every time the boss is hit. Each visit, the player MUST add
-// at least one word before they can Continue or Done.
+// Called every time the boss is hit. The player has 60s (lazy-start) to
+// type a line in the textarea. Chips append to the textarea. Done button
+// requires >=5 whitespace-separated tokens. Timeout auto-saves what's
+// typed and returns to the boss fight.
 function showCompose(idx, onContinueFight, onDone) {
   const lvl = LEVELS[idx];
-  composeAddedThisVisit = 0;  // reset counter for this hit
 
   document.getElementById('compose-label').textContent = `LEVEL ${idx + 1} — BUILD LINE ${idx + 1}`;
   document.getElementById('compose-endword').textContent = lvl.endWord;
 
-  // typed-input
+  // Restore any words typed/added in a prior visit (currentLineWords)
+  // by prefilling the textarea with them. That way the player picks up
+  // exactly where they left off after a timeout.
   const typedInput = document.getElementById('compose-typed-input');
-  typedInput.value = '';
-  typedInput.placeholder = '…or type your own word';
+  const hadPriorWords = (GAME.currentLineWords || []).length > 0;
+  composeTypedText = (GAME.currentLineWords || []).join(' ');
+  typedInput.value = composeTypedText;
+  typedInput.placeholder = 'Type your line here…';
 
   refreshCompose(idx, onContinueFight, onDone);
   showOverlay('overlay-compose');
 
-  // 60-second compose window — armed but not yet ticking. Starts the moment
-  // the player begins typing or clicks a chip. On timeout, auto-return to
-  // the boss fight, keeping any words already added (they live in
-  // GAME.currentLineWords). The timeout bypasses the "must-add-a-word" gate.
+  // 60-second window. Armed but not yet ticking. Starts on first keystroke
+  // or first chip click. On timeout, save typed text → currentLineWords
+  // and return to fighting.
   armComposeTimer(() => {
-    Audio.click();
+    finalizeTypedToWords();
     onContinueFight();
   });
 
-  // bind once-per-show: typed add
-  const addTypedBtn = document.getElementById('btn-compose-add-typed');
-  addTypedBtn.onclick = () => {
-    handleTypedAdd(idx, onContinueFight, onDone);
-  };
-  // any keystroke that produces a character starts the timer
-  typedInput.oninput = () => {
-    if (typedInput.value.length > 0) ensureComposeTimerRunning();
-  };
-  typedInput.onkeydown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleTypedAdd(idx, onContinueFight, onDone);
-    }
-  };
-}
-
-function handleTypedAdd(idx, onContinueFight, onDone) {
-  const typedInput = document.getElementById('compose-typed-input');
-  const raw = typedInput.value.trim();
-  if (!raw) return;
-  // simple sanitization — keep letters, spaces, hyphens, apostrophes
-  const cleaned = raw.replace(/[^\p{L}\p{M}\s'-]/gu, '').slice(0, 24).trim();
-  if (!cleaned) {
-    typedInput.value = '';
-    return;
+  // If we re-opened compose with words already from a prior visit, start
+  // the timer immediately — the player has already been working on this
+  // line, so they're "in progress" already. This also makes the Done
+  // button immediately usable for the corner case where 5+ words are
+  // already typed: no further interaction required.
+  if (hadPriorWords) {
+    ensureComposeTimerRunning();
   }
-  ensureComposeTimerRunning();
-  Audio.collectWord();
-  GAME.currentLineWords.push(cleaned);
-  composeAddedThisVisit++;
-  typedInput.value = '';
-  refreshCompose(idx, onContinueFight, onDone);
-  // give focus back to input so they can keep typing if they want
-  typedInput.focus();
+
+  // typing handler — updates state and refreshes UI
+  typedInput.oninput = () => {
+    composeTypedText = typedInput.value;
+    if (composeTypedText.length > 0) ensureComposeTimerRunning();
+    refreshCompose(idx, onContinueFight, onDone);
+  };
+  // ignore Enter / Tab as form-submit; allow newlines (textarea handles it)
+  typedInput.onkeydown = (e) => {
+    // No special behavior — textarea allows multiline naturally.
+    // We don't bind Enter to add anymore; words are tokens of typed text.
+  };
 }
 
-// re-render the dynamic parts (poem, word bank, buttons)
-function refreshCompose(idx, onContinueFight, onDone) {
-  document.getElementById('full-poem-display').innerHTML = renderFullPoem(idx);
-  document.getElementById('compose-word-count').textContent = GAME.currentLineWords.length;
+// Save the textarea contents into GAME.currentLineWords as tokenized words.
+// Called from the Done click and timeout paths.
+function finalizeTypedToWords() {
+  GAME.currentLineWords = tokenizeTypedText(composeTypedText);
+}
 
+// re-render the dynamic parts (poem, word bank, button states)
+function refreshCompose(idx, onContinueFight, onDone) {
+  const tokens = tokenizeTypedText(composeTypedText);
+
+  // Show the line as it will be rendered — in the FullPoem display we use
+  // GAME.currentLineWords. Update it from the live textarea so the player
+  // sees their work in context.
+  GAME.currentLineWords = tokens;
+  document.getElementById('full-poem-display').innerHTML = renderFullPoem(idx);
+  document.getElementById('compose-word-count').textContent = tokens.length;
+
+  // word bank chips: each chip click appends the word to the textarea
   const grid = document.getElementById('compose-wordbank');
+  const typedInput = document.getElementById('compose-typed-input');
   grid.innerHTML = '';
   if (GAME.wordBank.length === 0) {
-    grid.innerHTML = '<p class="wordbank-empty">No collected words yet — break W blocks or stomp enemies during the level. You can also type any word above.</p>';
+    grid.innerHTML = '<p class="wordbank-empty">No collected words yet — break W blocks or stomp enemies during the level. You can also type any word in the box above.</p>';
   } else {
-    // count usage so duplicates can be marked unused
-    const used = {};
-    for (const w of GAME.currentLineWords) used[w] = (used[w] || 0) + 1;
-    const remaining = {};
-    for (const w of GAME.wordBank) remaining[w] = (remaining[w] || 0) + 1;
-    for (const w in used) remaining[w] = Math.max(0, (remaining[w] || 0) - used[w]);
     GAME.wordBank.forEach((w) => {
       const chip = document.createElement('span');
       chip.className = 'word-chip';
       chip.textContent = w;
-      if ((remaining[w] || 0) <= 0) {
-        chip.classList.add('used');
-      } else {
-        chip.onclick = () => {
-          ensureComposeTimerRunning();
-          Audio.collectWord();
-          GAME.currentLineWords.push(w);
-          composeAddedThisVisit++;
-          refreshCompose(idx, onContinueFight, onDone);
-        };
-      }
+      chip.onclick = () => {
+        ensureComposeTimerRunning();
+        Audio.collectWord();
+        // Append to textarea with a leading space if needed.
+        const cur = typedInput.value;
+        const sep = (cur.length === 0 || /\s$/.test(cur)) ? '' : ' ';
+        typedInput.value = cur + sep + w + ' ';
+        composeTypedText = typedInput.value;
+        // Keep focus in the textarea so the player can keep typing.
+        typedInput.focus();
+        // Move caret to end
+        typedInput.setSelectionRange(typedInput.value.length, typedInput.value.length);
+        refreshCompose(idx, onContinueFight, onDone);
+      };
       grid.appendChild(chip);
     });
   }
 
-  // buttons
-  const btnUndo = document.getElementById('btn-compose-undo');
-  const btnContinue = document.getElementById('btn-compose-continue');
+  // Done button
   const btnDone = document.getElementById('btn-compose-done');
-
-  btnUndo.disabled = GAME.currentLineWords.length === 0;
-  btnUndo.style.opacity = btnUndo.disabled ? 0.4 : 1;
-  btnUndo.onclick = () => {
-    if (GAME.currentLineWords.length === 0) return;
-    Audio.click();
-    GAME.currentLineWords.pop();
-    if (composeAddedThisVisit > 0) composeAddedThisVisit--;
-    refreshCompose(idx, onContinueFight, onDone);
-  };
-
-  // Must have added at least one word THIS visit before continuing/done
-  const addedSomething = composeAddedThisVisit > 0;
-  btnContinue.disabled = !addedSomething;
-  btnContinue.title = addedSomething ? '' : 'Add a word first.';
-  btnContinue.onclick = () => {
-    if (!addedSomething) return;
-    Audio.click();
-    clearComposeTimer();
-    onContinueFight();
-  };
-
-  btnDone.disabled = !addedSomething || GAME.currentLineWords.length < 5;
-  if (!addedSomething) {
-    btnDone.title = 'Add a word first.';
-  } else if (GAME.currentLineWords.length < 5) {
-    btnDone.title = `Need ${5 - GAME.currentLineWords.length} more word${5 - GAME.currentLineWords.length === 1 ? '' : 's'} (5 minimum).`;
+  btnDone.disabled = tokens.length < 5;
+  if (tokens.length < 5) {
+    const need = 5 - tokens.length;
+    btnDone.title = `Need ${need} more word${need === 1 ? '' : 's'} (5 minimum).`;
   } else {
     btnDone.title = '';
   }
   btnDone.onclick = () => {
     if (btnDone.disabled) return;
     Audio.click();
+    finalizeTypedToWords();
     clearComposeTimer();
     onDone();
   };

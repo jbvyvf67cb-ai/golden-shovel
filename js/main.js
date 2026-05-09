@@ -50,10 +50,12 @@ document.getElementById('btn-title-start').onclick = () => {
 };
 
 // ---- game over retry ----
+// On death, the player retries the SAME level with HP and current-level
+// progress reset, but completed prior levels' poem lines are kept.
 document.getElementById('btn-gameover-retry').onclick = () => {
   Audio.click();
   hideOverlay('overlay-gameover');
-  resetGame();
+  restartLevel();
   if (document.body.classList.contains('touch')) {
     document.getElementById('touch-controls').classList.remove('hidden');
   }

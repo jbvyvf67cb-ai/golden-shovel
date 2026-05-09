@@ -57,7 +57,11 @@ const Boss = {
     const b = s.physics.add.sprite(bx, by, 'boss' + s.levelIdx);
     b.setOrigin(0.5, 1);
     b.body.allowGravity = false;
-    b.body.setSize(72, 80).setOffset(12, 12);
+    // Body extends from the boss's head DOWN to the ground. The boss sprite
+    // floats 50px above the ground, but the hitbox should reach the ground
+    // so that shovels thrown at player chest height can connect with it.
+    // Body height = 80 (sprite hitbox) + 50 (floating gap) = 130.
+    b.body.setSize(72, 130).setOffset(12, 12);
     b.setDepth(5);
     b.setAlpha(1);
     b.setScale(1);
@@ -90,8 +94,20 @@ const Boss = {
     s.bossProjectiles = s.physics.add.group({ allowGravity: false });
 
     // collisions
-    s.physics.add.overlap(s.player, b, (p, bo) => Boss.onPlayerHit(s, p, bo));
-    s.physics.add.overlap(s.projectiles, b, (pr, bo) => Boss.onShovelHit(s, pr, bo));
+    // Phaser sometimes swaps the order of args in overlap callbacks
+    // depending on which object is the Group, which is a single sprite,
+    // and physics tree internals. We normalize inside each callback by
+    // detecting which arg is the boss.
+    s.physics.add.overlap(s.player, b, (a1, a2) => {
+      const boss = (a1 === b) ? a1 : a2;
+      const player = (a1 === b) ? a2 : a1;
+      Boss.onPlayerHit(s, player, boss);
+    });
+    s.physics.add.overlap(s.projectiles, b, (a1, a2) => {
+      const boss = (a1 === b) ? a1 : a2;
+      const proj = (a1 === b) ? a2 : a1;
+      Boss.onShovelHit(s, proj, boss);
+    });
     s.physics.add.overlap(s.player, s.bossProjectiles, (p, pr) => Boss.onPlayerProjHit(s, p, pr));
     s.physics.add.collider(s.bossProjectiles, s.platforms, (pr, _g) => { pr.destroy(); });
 
@@ -223,23 +239,48 @@ const Boss = {
         gfx.fillCircle(b.x, b.y - 40, 30 + (1 - tf) * 30);
       }
     } else {
-      // VULNERABLE — show a clear "hit me!" indicator
-      const phase = s.time.now * 0.012;
-      gfx.lineStyle(2, 0xff5577, 0.55 + Math.sin(phase) * 0.2);
-      // dashed red ring (approximate via segments)
+      // VULNERABLE — make this VERY obvious. The shield is gone; the boss
+      // pulses with a red aura, has a thick dashed red attack ring, and
+      // shows a big bold "HIT!" arrow above the head.
+      const phase = s.time.now * 0.014;
+      const pulse = 0.6 + Math.sin(phase) * 0.4;
+      // Large red glow halo around the boss
+      gfx.fillStyle(0xff2244, 0.18 * pulse);
+      gfx.fillCircle(b.x, b.y - 40, 75);
+      gfx.fillStyle(0xff5577, 0.30 * pulse);
+      gfx.fillCircle(b.x, b.y - 40, 60);
+      // Thick outer red dashed ring (the "target")
+      gfx.lineStyle(6, 0xff3355, 0.85);
       const segs = 12;
       for (let i = 0; i < segs; i += 2) {
-        const a1 = (i / segs) * Math.PI * 2;
-        const a2 = ((i+1) / segs) * Math.PI * 2;
+        const a1 = (i / segs) * Math.PI * 2 + phase * 0.4;
+        const a2 = ((i + 1) / segs) * Math.PI * 2 + phase * 0.4;
         gfx.beginPath();
-        gfx.arc(b.x, b.y - 40, 60, a1, a2, false);
+        gfx.arc(b.x, b.y - 40, 70, a1, a2, false);
         gfx.strokePath();
       }
-      // floating "!" marker above
-      // (drawn as a simple shape)
-      gfx.fillStyle(0xff5577, 0.85);
-      gfx.fillRect(b.x - 2, b.y - 110, 4, 12);
-      gfx.fillRect(b.x - 2, b.y - 95, 4, 4);
+      // Inner thinner ring rotating opposite
+      gfx.lineStyle(3, 0xffaaaa, 0.7);
+      for (let i = 0; i < segs; i += 2) {
+        const a1 = (i / segs) * Math.PI * 2 - phase * 0.6;
+        const a2 = ((i + 1) / segs) * Math.PI * 2 - phase * 0.6;
+        gfx.beginPath();
+        gfx.arc(b.x, b.y - 40, 56, a1, a2, false);
+        gfx.strokePath();
+      }
+      // Big bouncing red downward-pointing arrow above the boss head
+      // pointing at the boss to say "hit me here"
+      const bounce = Math.sin(s.time.now * 0.012) * 4;
+      const ay = b.y - 120 + bounce;
+      gfx.fillStyle(0xff2244, 1);
+      // arrow shaft
+      gfx.fillRect(b.x - 4, ay, 8, 18);
+      // arrow head (downward triangle)
+      gfx.fillTriangle(b.x - 14, ay + 18, b.x + 14, ay + 18, b.x, ay + 32);
+      // small "HIT!" label-ish marks around the arrow
+      gfx.fillStyle(0xffff66, 0.9);
+      gfx.fillCircle(b.x - 22, ay + 8, 2);
+      gfx.fillCircle(b.x + 22, ay + 8, 2);
     }
   },
 
@@ -267,6 +308,7 @@ const Boss = {
 
   onShovelHit(s, proj, b) {
     if (!s.bossActive || s.bossDefeated) return;
+    if (!b || !b.active) return;
     if (b.invulnFrames > 0) {
       proj.setVelocity(-proj.body.velocity.x * 0.6, -200);
       Audio.shieldHit();
@@ -305,29 +347,51 @@ const Boss = {
     player.setVelocity(dx >= 0 ? 220 : -220, -300);
   },
 
-  // called after player chooses CONTINUE FIGHT in compose
+  // called after compose closes (timeout OR Continue Fight, but NOT Done).
+  // We reset the existing boss sprite's state in-place. Destroy/respawn was
+  // attractive for cleanliness but caused stale overlap colliders: Phaser
+  // arcade physics doesn't auto-remove a collider when the body is
+  // destroyed, so old destroyed bosses kept "catching" projectiles with
+  // wiped properties (shieldUp=undefined → falsy → bypass shield).
   resumeAfterCompose(s) {
     const b = s.boss;
     if (!b) return;
-    // belt-and-braces: make sure no tween or stale state has left the boss
-    // partly transparent / scaled / rotated / killed. The ONLY path that
-    // should change these is defeatBoss, but if anything else does, this
-    // resyncs.
+    // Kill any tween still targeting the boss sprite — that's the most
+    // likely cause of "boss disappears" (a leftover tween fading alpha or
+    // shrinking scale to 0).
+    if (s.tweens && s.tweens.killTweensOf) s.tweens.killTweensOf(b);
+    // Reset every visual property the boss could possibly be in.
     b.setAlpha(1);
     b.setScale(1);
     b.setAngle(0);
     b.setVisible(true);
     if (!b.active) b.setActive(true);
     b.clearTint();
+    // Re-set the texture from the level's known boss texture so that even
+    // if something corrupted it, it's restored.
+    try { b.setTexture('boss' + s.levelIdx); } catch (e) { /* ignore */ }
+    // Snap position back into the arena center if x/y went non-finite.
+    if (!isFinite(b.x) || !isFinite(b.y)) {
+      b.x = b.center.x;
+      b.y = b.center.y;
+    }
+    // Reset gameplay state — bump cycle so difficulty progresses.
+    b.cycleCount = (b.cycleCount || 0) + 1;
     b.shieldUp = true;
     b.shieldFrames = Math.max(BOSS_CFG.shieldUpFramesMin,
                               BOSS_CFG.shieldUpFrames - b.cycleCount * 18);
+    b.vulnerableFrames = Math.max(60, BOSS_CFG.vulnerableFrames - b.cycleCount * 8);
     b.invulnFrames = BOSS_CFG.invulnAfterCompose;
-    b.throwTimer = 30 + Math.random() * 60; // throws sooner
+    b.throwTimer = 30 + Math.random() * 60;
     b.throwTelegraph = 0;
-    // give boss slightly more range each cycle (more dynamic)
-    // — capped well below arena edges so it never "leaves" the screen.
-    b.range = Math.min(b.range + 12, 180);
+    b.flashTimer = 0;
+    b.dashVel = 0;
+    b.range = Math.min((b.range || BOSS_CFG.moveRange) + 12, 180);
+    // Make sure the physics body is enabled (in case something disabled it).
+    if (b.body) {
+      b.body.enable = true;
+      b.body.checkCollision.none = false;
+    }
   },
 
   // hard despawn on defeat

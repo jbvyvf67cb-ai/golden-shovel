@@ -117,3 +117,16 @@ function resetGame() {
   GAME.currentLineWords = [];
   GAME.invincibleUntil = 0;
 }
+
+// Reset for a single level retry — preserves cross-level progress
+// (current level index, completed poem lines from prior levels).
+// The current level's word bank, in-progress line, and HP all reset.
+function restartLevel() {
+  GAME.hp = GAME.maxHp;
+  GAME.wordBank = [];
+  GAME.currentLineWords = [];
+  GAME.invincibleUntil = 0;
+  // GAME.levelIdx is preserved
+  // GAME.poemLines is preserved (lines from beaten bosses stay locked in)
+  // GAME.availableWordPool is preserved (don't reshuffle the world's words mid-run)
+}

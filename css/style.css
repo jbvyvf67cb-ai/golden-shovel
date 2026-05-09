@@ -359,16 +359,24 @@ body.touch #touch-controls.hidden { display: none; }
 }
 #compose-typed-input {
   flex: 1;
+  width: 100%;
   padding: 10px 14px;
   background: rgba(13, 26, 19, 0.7);
   border: 2px solid #6a8a3a;
   border-radius: 8px;
   color: #f4ecd0;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.5;
   outline: none;
   transition: border-color 0.2s;
   -webkit-user-select: text; user-select: text;
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  box-sizing: border-box;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 #compose-typed-input:focus { border-color: #d4a437; }
 #compose-typed-input::placeholder { color: #6a7a6f; font-style: italic; }
@@ -457,17 +465,19 @@ body.touch #touch-controls.hidden { display: none; }
   min-width: 22px;
   flex-shrink: 0;
 }
-/* The "before" portion sits on the left and grows; */
-/* the dot leader fills the gap; */
+/* The "before" portion sits on the left and grows to its content; */
+/* the dot leader fills only the remaining space; */
 /* the end word is pinned to the right, like the buried Yeats word. */
 .full-poem-display .pl-text {
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 0;
+  max-width: 100%;
   color: #f4ecd0;
   word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .full-poem-display .pl-leader {
-  flex: 1 1 24px;
+  flex: 0 1 auto;
   min-width: 24px;
   border-bottom: 1px dotted rgba(212, 164, 55, 0.35);
   height: 1.1em;
@@ -477,7 +487,7 @@ body.touch #touch-controls.hidden { display: none; }
 .full-poem-display .pl-end {
   color: #d4a437;
   font-weight: bold;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   border-bottom: 1px solid #d4a437;
   padding: 0 2px;
   letter-spacing: 0.5px;

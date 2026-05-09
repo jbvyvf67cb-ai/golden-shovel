@@ -751,13 +751,17 @@ class PlayScene extends Phaser.Scene {
           showFinalPoem();
         } else {
           GAME.levelIdx++;
-          // resume + stop + start ensures a clean teardown of the paused scene.
-          // Going through Boot is overkill (re-generates textures); instead we
-          // explicitly stop and start Play so its init() re-reads GAME.levelIdx.
+          // Route through Boot scene for clean state. Boot regenerates
+          // textures (cheap, since they're cached in the texture manager
+          // by key) and then transitions to Play, which re-reads
+          // GAME.levelIdx in its init().
           this.physics.resume();
           this.scene.resume();
           this.scene.stop();
-          this.scene.start('Play');
+          // Use the Phaser SceneManager directly to start fresh from Boot.
+          // This is the same flow as on retry from the gameover screen,
+          // which we know works reliably.
+          this.scene.start('Boot');
         }
       });
     });
